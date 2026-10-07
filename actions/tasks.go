@@ -23,6 +23,15 @@ func TasksIndex(c buffalo.Context) error {
 	c.Set("tasks", tasks)
 	c.Set("task", &models.Task{})
 	c.Set("errors", validate.NewErrors())
+
+	// ?edit=<id> abre el formulario de edición en línea de esa tarea.
+	editID, editTitle := "", ""
+	for _, t := range tasks {
+		if t.ID.String() == c.Param("edit") {
+			editID, editTitle = t.ID.String(), t.Title
+		}
+	}
+	setEditState(c, editID, editTitle, validate.NewErrors())
 	return c.Render(http.StatusOK, r.HTML("tasks/index.plush.html"))
 }
 
@@ -50,10 +59,47 @@ func TasksCreate(c buffalo.Context) error {
 		c.Set("tasks", tasks)
 		c.Set("task", task)
 		c.Set("errors", verrs)
+		setEditState(c, "", "", validate.NewErrors())
 		return c.Render(http.StatusUnprocessableEntity, r.HTML("tasks/index.plush.html"))
 	}
 
 	c.Flash().Add("success", "Tarea creada.")
+	return c.Redirect(http.StatusSeeOther, "/")
+}
+
+// TasksUpdate cambia el título de una tarea existente.
+func TasksUpdate(c buffalo.Context) error {
+	tx := c.Value("tx").(*pop.Connection)
+
+	task := &models.Task{}
+	if err := tx.Find(task, c.Param("task_id")); err != nil {
+		return c.Error(http.StatusNotFound, err)
+	}
+
+	if err := c.Bind(task); err != nil {
+		return err
+	}
+	task.Title = strings.TrimSpace(task.Title)
+
+	verrs, err := tx.ValidateAndUpdate(task)
+	if err != nil {
+		return err
+	}
+
+	if verrs.HasAny() {
+		tasks := models.Tasks{}
+		if err := tx.Order("created_at asc, id asc").All(&tasks); err != nil {
+			return err
+		}
+
+		c.Set("tasks", tasks)
+		c.Set("task", &models.Task{})
+		c.Set("errors", validate.NewErrors())
+		setEditState(c, task.ID.String(), task.Title, verrs)
+		return c.Render(http.StatusUnprocessableEntity, r.HTML("tasks/index.plush.html"))
+	}
+
+	c.Flash().Add("success", "Tarea actualizada.")
 	return c.Redirect(http.StatusSeeOther, "/")
 }
 
@@ -89,4 +135,12 @@ func TasksDestroy(c buffalo.Context) error {
 
 	c.Flash().Add("success", "Tarea eliminada.")
 	return c.Redirect(http.StatusSeeOther, "/")
+}
+
+// setEditState indica a la plantilla qué tarea tiene abierto el formulario de
+// edición, con el título enviado y sus errores de validación.
+func setEditState(c buffalo.Context, id, title string, verrs *validate.Errors) {
+	c.Set("editID", id)
+	c.Set("editTitle", title)
+	c.Set("editErrors", verrs)
 }

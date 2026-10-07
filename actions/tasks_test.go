@@ -107,3 +107,66 @@ func (as *ActionSuite) Test_TasksDestroy_NotFound() {
 	res := as.HTML("/tasks/%s", id).Delete()
 	as.Equal(404, res.Code)
 }
+
+func (as *ActionSuite) Test_TasksIndex_EditShowsInlineForm() {
+	task := &models.Task{Title: "Tarea a editar"}
+	verrs, err := as.DB.ValidateAndCreate(task)
+	as.NoError(err)
+	as.False(verrs.HasAny())
+
+	res := as.HTML("/?edit=%s", task.ID).Get()
+	as.Equal(200, res.Code)
+
+	body := res.Body.String()
+	as.Contains(body, `action="/tasks/`+task.ID.String()+`"`)
+	as.Contains(body, `value="Tarea a editar"`)
+	as.Contains(body, "Guardar")
+}
+
+func (as *ActionSuite) Test_TasksUpdate_Valid() {
+	task := &models.Task{Title: "Título original"}
+	verrs, err := as.DB.ValidateAndCreate(task)
+	as.NoError(err)
+	as.False(verrs.HasAny())
+
+	res := as.HTML("/tasks/%s", task.ID).Put(url.Values{"title": {"  Título nuevo  "}})
+	as.Equal(303, res.Code)
+	as.Equal("/", res.Header().Get("Location"))
+
+	as.NoError(as.DB.Reload(task))
+	as.Equal("Título nuevo", task.Title)
+}
+
+func (as *ActionSuite) Test_TasksUpdate_KeepsCompleted() {
+	task := &models.Task{Title: "Ya completada", Completed: true}
+	verrs, err := as.DB.ValidateAndCreate(task)
+	as.NoError(err)
+	as.False(verrs.HasAny())
+
+	res := as.HTML("/tasks/%s", task.ID).Put(url.Values{"title": {"Renombrada"}})
+	as.Equal(303, res.Code)
+
+	as.NoError(as.DB.Reload(task))
+	as.Equal("Renombrada", task.Title)
+	as.True(task.Completed)
+}
+
+func (as *ActionSuite) Test_TasksUpdate_EmptyTitle_Invalid() {
+	task := &models.Task{Title: "No se debe vaciar"}
+	verrs, err := as.DB.ValidateAndCreate(task)
+	as.NoError(err)
+	as.False(verrs.HasAny())
+
+	res := as.HTML("/tasks/%s", task.ID).Put(url.Values{"title": {"   "}})
+	as.Equal(422, res.Code)
+	as.Contains(res.Body.String(), "El título es obligatorio.")
+
+	as.NoError(as.DB.Reload(task))
+	as.Equal("No se debe vaciar", task.Title)
+}
+
+func (as *ActionSuite) Test_TasksUpdate_NotFound() {
+	id := uuid.Must(uuid.NewV4())
+	res := as.HTML("/tasks/%s", id).Put(url.Values{"title": {"Lo que sea"}})
+	as.Equal(404, res.Code)
+}

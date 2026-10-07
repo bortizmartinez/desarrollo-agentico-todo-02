@@ -94,7 +94,8 @@ h1 {
   gap: var(--space-s);
 }
 
-.new-task input[type="text"] {
+.new-task input[type="text"],
+.edit-task input[type="text"] {
   flex: 1;
   padding: var(--space-s) var(--space-m);
   font-size: var(--font-size-base);
@@ -198,6 +199,36 @@ input:focus-visible {
   gap: var(--space-s);
 }
 
+/* Edición en línea de una tarea */
+.edit-task {
+  flex: 1;
+}
+
+.edit-task-row {
+  display: flex;
+  gap: var(--space-s);
+}
+
+.edit-task input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+
+a.button {
+  display: inline-block;
+  text-decoration: none;
+  line-height: normal;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 /* Estado vacío */
 .empty-state {
   text-align: center;
@@ -214,7 +245,8 @@ input:focus-visible {
     padding: var(--space-l) var(--space-s);
   }
 
-  .new-task-row {
+  .new-task-row,
+  .edit-task-row {
     flex-direction: column;
   }
 
